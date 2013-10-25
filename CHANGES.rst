@@ -10,6 +10,9 @@ Changelog
 - Documentation updates
   [saily]
 
+- Add a radio widget as masterwidget.
+  [saily]
+
 
 1.1 (2013-08-26)
 ----------------

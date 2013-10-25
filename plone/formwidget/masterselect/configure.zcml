@@ -39,6 +39,13 @@
         template="checkbox_input.pt"
         />
 
+    <z3c:widgetTemplate
+        mode="input"
+        widget=".interfaces.IMasterSelectRadioWidget"
+        layer="z3c.form.interfaces.IFormLayer"
+        template="radio_input.pt"
+        />
+
     <!-- Generic Setup -->
     <gs:registerProfile
       name="default"
