@@ -12,7 +12,7 @@ from zope.i18n import translate
 
 from z3c.form import interfaces
 from z3c.form.widget import FieldWidget
-from z3c.form.browser import select, checkbox
+from z3c.form.browser import select, checkbox, radio
 
 from plone.formwidget.masterselect.interfaces import IMasterSelectField
 from plone.formwidget.masterselect.interfaces import IMasterSelectBoolField
@@ -118,7 +118,7 @@ class MasterSelectWidget(select.SelectWidget, MasterSelect):
     klass = u'masterselect-widget'
 
 
-class MasterSelectRadioWidget(select.SelectWidget, MasterSelect):
+class MasterSelectRadioWidget(radio.RadioWidget, MasterSelect):
     """ Master select radio widget
     """
     implements(IMasterSelectRadioWidget)

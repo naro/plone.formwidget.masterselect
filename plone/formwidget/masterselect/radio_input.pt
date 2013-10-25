@@ -29,10 +29,10 @@
                            onfocus view/onfocus;
                            onblur view/onblur;
                            onchange view/onchange;
-                           checked python:item['selected'] and 'selected' or nothing"
+                           checked python:item['checked'] and 'checked' or nothing"
     /><label for=""
              tal:attributes="for item/id">
-        <span class="label" tal:content="item/content">Label</span>
+        <span class="label" tal:content="item/label">Label</span>
     </label>
 </span>
 
