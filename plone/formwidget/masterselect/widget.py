@@ -1,4 +1,6 @@
+# -*- coding: utf-8 -*-
 from Acquisition import aq_inner, aq_parent
+from Products.Five.browser import BrowserView
 
 from zope.component import adapter
 from zope.interface import implements, implementer
@@ -12,12 +14,11 @@ from z3c.form import interfaces
 from z3c.form.widget import FieldWidget
 from z3c.form.browser import select, checkbox
 
-from Products.Five.browser import BrowserView
-
 from plone.formwidget.masterselect.interfaces import IMasterSelectField
 from plone.formwidget.masterselect.interfaces import IMasterSelectBoolField
 from plone.formwidget.masterselect.interfaces import IMasterSelectWidget
 from plone.formwidget.masterselect.interfaces import IMasterSelectBoolWidget
+from plone.formwidget.masterselect.interfaces import IMasterSelectRadioWidget
 
 try:
     # python 2.6
@@ -26,12 +27,11 @@ except:
     # plone 3.3
     import simplejson as json
 
-
 BINDERS = dict(
-    vocabulary= "jQuery('%(masterID)s').bindMasterSlaveVocabulary(%(json)s);",
-    value     = "jQuery('%(masterID)s').bindMasterSlaveValue(%(json)s);",
-    attr      = "jQuery('%(masterID)s').bindMasterSlaveAttr(%(json)s);",
-    toggle    = "jQuery('%(masterID)s').bindMasterSlaveToggle(%(json)s);"
+    vocabulary= "jQuery('%(masterID)s').bindMasterSlaveVocabulary(%(json)s);",  # noqa
+    value     = "jQuery('%(masterID)s').bindMasterSlaveValue(%(json)s);",  # noqa
+    attr      = "jQuery('%(masterID)s').bindMasterSlaveAttr(%(json)s);",  # noqa
+    toggle    = "jQuery('%(masterID)s').bindMasterSlaveToggle(%(json)s);"  # noqa
 )
 
 JQUERY_ONLOAD = """\
@@ -52,27 +52,32 @@ class MasterSelect(object):
 
     def getSlaves(self):
         slaves = (getattr(self.field, 'slave_fields', None)
-                or getattr(self.field.value_type, 'slave_fields', ()))
+                  or getattr(self.field.value_type, 'slave_fields', ()))
         for slave in slaves:
             yield slave.copy()
 
+    def get_slave_id(self, slave):
+        if 'slaveID' in slave:
+            return slave['slaveID']
+
+        # Try to get it from widget
+        widget = self.form.widgets.get(slave['name'], None)
+        if widget is not None and getattr(widget, 'id', None) is not None:
+            return '#' + widget.id
+
+        # Try our best to create one; won't work for checkboxes, so
+        # better to provide a slaveID in the schema in that case or
+        # sometimes to increase the scope beyond the field
+        prefix = '-'.join(self.id.split('-')[:-1])
+        return '#%s-%s' % (prefix, slave['name'])
+
     def renderJS(self):
         url = '/'.join(self.request.physicalPathFromURL(self.request.getURL()))
-        widgetURL = url + '/++widget++%s/@@masterselect-jsonvalue' % self.__name__
+        widgetURL = '%s/++widget++%s/@@masterselect-jsonvalue' % (
+            url, self.__name__)
 
         for slave in self.getSlaves():
-            if not 'slaveID' in slave:
-                # Try to get it from widget
-                widget = self.form.widgets.get(slave['name'])
-                if widget is not None and getattr(widget, 'id', None) is not None:
-                    slave['slaveID'] = '#' + widget.id
-                else:
-                    # Try our best to create one; won't work for checkboxes, so
-                    # better to provide a slaveID in the schema in that case or
-                    # sometimes to increase the scope beyond the field
-                    prefix = '-'.join(self.id.split('-')[:-1])
-                    slave['slaveID'] = '#%s-%s' % (prefix, slave['name'])
-
+            slave['slaveID'] = self.get_slave_id(slave)
             slave['url'] = widgetURL
             slave['masterID'] = '#' + slave.get('masterID', self.id)
             slave['siblings'] = slave.get('siblings', False)
@@ -85,8 +90,6 @@ class MasterSelect(object):
                     values = [values]
                 if IBool.providedBy(self.field):
                     values = [boolean_value(v) for v in values]
-                #else:
-                #    values = [str(v) for v in values]
                 slave['values'] = values
 
             js_template = BINDERS.get(slave.get('action')) or BINDERS['toggle']
@@ -96,9 +99,10 @@ class MasterSelect(object):
             slave.pop('hide_values', None)
             slave.pop('control_param', None)
 
-            settings = {'masterID': slave['masterID'],
-                        'json': json.dumps(slave)
-                       }
+            settings = {
+                'masterID': slave['masterID'],
+                'json': json.dumps(slave)
+            }
             yield js_template % settings
 
     def getInlineJS(self):
@@ -107,15 +111,23 @@ class MasterSelect(object):
 
 
 class MasterSelectWidget(select.SelectWidget, MasterSelect):
-    """Master Select Widget
+    """ Master Select Widget
     """
     implements(IMasterSelectWidget)
 
     klass = u'masterselect-widget'
 
 
+class MasterSelectRadioWidget(select.SelectWidget, MasterSelect):
+    """ Master select radio widget
+    """
+    implements(IMasterSelectRadioWidget)
+
+    klass = u'masterselect-radio-widget'
+
+
 class MasterSelectBoolWidget(checkbox.SingleCheckBoxWidget, MasterSelect):
-    """MasterSelectBoolWidget
+    """ MasterSelectBoolWidget
     """
     implements(IMasterSelectBoolWidget)
 
@@ -126,6 +138,12 @@ class MasterSelectBoolWidget(checkbox.SingleCheckBoxWidget, MasterSelect):
 @adapter(IMasterSelectField, interfaces.IFormLayer)
 def MasterSelectFieldWidget(field, request):
     return FieldWidget(field, MasterSelectWidget(request))
+
+
+@implementer(interfaces.IFieldWidget)
+@adapter(IMasterSelectField, interfaces.IFormLayer)
+def MasterSelectRadioFieldWidget(field, request):
+    return FieldWidget(field, MasterSelectRadioWidget(request))
 
 
 @implementer(interfaces.IFieldWidget)
@@ -192,12 +210,12 @@ class MasterSelectJSONValue(BrowserView):
             if action not in ['vocabulary', 'value', 'attr']:
                 continue
 
-            # --- VALUE --------------------------------------------------------
+            # --- VALUE -------------------------------------------------------
             if action == 'value':
                 value = self.getVocabulary(slave, value, '')
                 return json.dumps(translate(value, self.request))
 
-            # --- ATTR- --------------------------------------------------------
+            # --- ATTR- -------------------------------------------------------
             if action == 'attr':
                 result = self.getVocabulary(slave, value, None)
                 if isinstance(result, dict) and 'attr' in result and 'value' in result:
@@ -205,7 +223,7 @@ class MasterSelectJSONValue(BrowserView):
                 else:
                     raise ValueError('Bad attr dictionary for %s.' % slavename)
 
-            # --- VOCABULARY ---------------------------------------------------
+            # --- VOCABULARY --------------------------------------------------
             vocabulary = self.getVocabulary(slave, value)
 
             if isinstance(vocabulary, (tuple, list)):
@@ -226,7 +244,7 @@ class MasterSelectJSONValue(BrowserView):
                 widget.updateTerms()
                 widget.update()
                 # widget may define items as a property or as a method
-                items = widget.items if not callable(widget.items) else widget.items() 
+                items = widget.items if not callable(widget.items) else widget.items()
                 responseJSON = {'items': items}
 
                 # disable select box if term length = 'disable_length'
