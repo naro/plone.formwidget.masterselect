@@ -7,6 +7,9 @@ Changelog
 - Added a ('fast') jQuery transition on show/hide function.
   [thomasdesvenain]
 
+- Documentation updates
+  [saily]
+
 
 1.1 (2013-08-26)
 ----------------
