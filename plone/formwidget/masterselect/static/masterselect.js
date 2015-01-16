@@ -82,7 +82,7 @@
         }
     };
     $.fn.bindMasterSlaveVocabulary = function(data) {
-        var trigger = data.initial_trigger ? data.initial_trigger : false;
+        var trigger = data.initial_trigger ? data.initial_trigger : true;
         // NEW:
         // Disable slave select if empty
         // Only if it's a select field??
